@@ -1,6 +1,6 @@
 {
   "name": "govgate",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Governance gate for releases: report CI test results (JUnit XML) to your testing tool and gate promotion on the outcome.",
   "license": "MIT",
   "author": "HatStack",
@@ -25,7 +25,8 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepack": "npm run build"
   },
   "dependencies": {
     "commander": "^14.0.2",
