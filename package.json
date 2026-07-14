@@ -1,6 +1,6 @@
 {
   "name": "govgate",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "Governance gate for releases: report CI test results (JUnit XML) to your testing tool and gate promotion on the outcome.",
   "license": "MIT",
   "author": "HatStack",

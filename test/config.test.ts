@@ -9,8 +9,8 @@ const savedEnv = { ...process.env };
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mtcli-"));
-  delete process.env.MT_TESTING_TOOL_URL;
-  delete process.env.MT_TESTING_TOOL_API_KEY;
+  delete process.env.GOVGATE_URL;
+  delete process.env.GOVGATE_API_KEY;
 });
 
 afterEach(() => {
@@ -25,8 +25,8 @@ describe("resolveConfig", () => {
     );
     const nested = join(dir, "a", "b");
     mkdirSync(nested, { recursive: true });
-    process.env.MT_TESTING_TOOL_URL = "https://tool.example/";
-    process.env.MT_TESTING_TOOL_API_KEY = "mtk_test";
+    process.env.GOVGATE_URL = "https://tool.example/";
+    process.env.GOVGATE_API_KEY = "mtk_test";
 
     const cfg = resolveConfig({}, nested);
     expect(cfg.suite).toBe("s1");
@@ -37,8 +37,8 @@ describe("resolveConfig", () => {
 
   it("flags override env and file", () => {
     writeFileSync(join(dir, ".mt-testing.json"), JSON.stringify({ suite: "file-suite" }));
-    process.env.MT_TESTING_TOOL_URL = "https://env.example";
-    process.env.MT_TESTING_TOOL_API_KEY = "mtk_env";
+    process.env.GOVGATE_URL = "https://env.example";
+    process.env.GOVGATE_API_KEY = "mtk_env";
 
     const cfg = resolveConfig({ suite: "flag-suite", url: "https://flag.example" }, dir);
     expect(cfg.suite).toBe("flag-suite");
@@ -48,9 +48,9 @@ describe("resolveConfig", () => {
 
   it("throws actionable errors for missing url/key/suite", () => {
     expect(() => resolveConfig({}, dir)).toThrow(ConfigError);
-    process.env.MT_TESTING_TOOL_URL = "https://x";
+    process.env.GOVGATE_URL = "https://x";
     expect(() => resolveConfig({}, dir)).toThrow(/API key/);
-    process.env.MT_TESTING_TOOL_API_KEY = "mtk_x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
     expect(() => resolveConfig({}, dir)).toThrow(/Suite/);
   });
 
@@ -59,8 +59,8 @@ describe("resolveConfig", () => {
       join(dir, ".mt-testing.json"),
       JSON.stringify({ suite: "s", mappings: { abc: ["x"] } }),
     );
-    process.env.MT_TESTING_TOOL_URL = "https://x";
-    process.env.MT_TESTING_TOOL_API_KEY = "mtk_x";
+    process.env.GOVGATE_URL = "https://x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
     expect(() => resolveConfig({}, dir)).toThrow(/case number/);
   });
 });
@@ -78,7 +78,7 @@ describe("loadFileMappings (dry-run, credential-free)", () => {
         mappings: { "5": ["*Duplicate_Active_Email*"], "28": ["*SoftDelete_Resolves*"] },
       }),
     );
-    // deliberately no MT_TESTING_TOOL_URL / _API_KEY in env (cleared in beforeEach)
+    // deliberately no GOVGATE_URL / _API_KEY in env (cleared in beforeEach)
     const cfg = loadFileMappings({}, dir);
     expect(cfg.mappings).toEqual({
       "5": ["*Duplicate_Active_Email*"],

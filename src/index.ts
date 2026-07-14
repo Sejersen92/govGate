@@ -73,14 +73,14 @@ async function completeAndGate(api: ApiClient, url: string, runId: string, gate:
 
 const program = new Command()
   .name("govgate")
-  .description("Report CI test results to the MT Testing Tool and gate releases on the outcome.");
+  .description("Report CI test results to your testing tool and gate releases on the outcome.");
 
 program
   .command("report")
   .description("Parse test result files (JUnit XML), map tests to cases, and report a run")
   .argument("<files...>", "result files or globs, e.g. test-results/*.xml")
-  .option("--url <url>", "tool URL (or MT_TESTING_TOOL_URL)")
-  .option("--api-key <key>", "API key (prefer MT_TESTING_TOOL_API_KEY)")
+  .option("--url <url>", "tool URL (or GOVGATE_URL)")
+  .option("--api-key <key>", "API key (prefer GOVGATE_API_KEY)")
   .option("--config <path>", "path to .mt-testing.json (default: searched upward)")
   .option("--suite <slug>", "suite slug (overrides config)")
   .option("--env <slug>", "environment slug (overrides config)")
@@ -188,8 +188,8 @@ program
   .command("complete")
   .description("Complete a run and evaluate the gate (final job of a multi-job pipeline)")
   .requiredOption("--run-id <uuid>", "run to complete")
-  .option("--url <url>", "tool URL (or MT_TESTING_TOOL_URL)")
-  .option("--api-key <key>", "API key (prefer MT_TESTING_TOOL_API_KEY)")
+  .option("--url <url>", "tool URL (or GOVGATE_URL)")
+  .option("--api-key <key>", "API key (prefer GOVGATE_API_KEY)")
   .option("--config <path>", "path to .mt-testing.json")
   .option("--suite <slug>", "suite slug (only used for config resolution)")
   .option("--fail-on <list>", "statuses that fail the gate: fail | fail,blocked", "fail")

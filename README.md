@@ -1,6 +1,6 @@
 # govgate
 
-Pipeline-step CLI for the MT Testing Tool: parses standard test output (JUnit XML),
+Pipeline-step CLI for Governance OS: parses standard test output (JUnit XML),
 maps tests to test cases, reports a run, and **gates the release** via its exit code.
 No SDK in application code — only the pipeline YAML changes.
 
@@ -19,8 +19,8 @@ standard reporter.
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--url <url>` | `MT_TESTING_TOOL_URL` | Tool deployment URL |
-| `--api-key <key>` | `MT_TESTING_TOOL_API_KEY` | API key (env var strongly preferred) |
+| `--url <url>` | `GOVGATE_URL` | Tool deployment URL |
+| `--api-key <key>` | `GOVGATE_API_KEY` | API key (env var strongly preferred) |
 | `--config <path>` | `.mt-testing.json` searched upward | Config file |
 | `--suite <slug>` | config `suite` | Target suite |
 | `--env <slug>` | config `defaultEnvironment` | Environment for the run |
@@ -83,10 +83,9 @@ any passing → `pass`; all skipped → the case is not posted (stays pending �
 test is a non-observation). Suite cases with no mapped tests stay pending and are
 listed as "uncovered" in the summary.
 
-Use the `map-tests` Claude Code skill (in the
-[Maersk-Training/mt-testing-tool](https://github.com/Maersk-Training/mt-testing-tool)
-repo under `skills/`) to generate the mapping semi-automatically, and `--dry-run` to
-validate it.
+Use the `map-tests` Governance OS skill (served by your deployment at
+`${GOVGATE_URL}/api/v1/skills`) to generate the mapping semi-automatically, and
+`--dry-run` to validate it.
 
 ## .NET specifics (learned the hard way)
 
@@ -102,28 +101,25 @@ validate it.
 - **Classic Release has no source checkout**: `dotnet publish` the test project into
   the build artifact (`drop/tests/`) and run it with the ".NET Core" task using
   Command `custom` + `vstest` — the `run` command does NOT execute arbitrary commands.
-- The full ADO runbook (variable groups, stage scoping, exact task configs) lives in
-  `skills/onboard-repo/reference.md` in the
-  [Maersk-Training/mt-testing-tool](https://github.com/Maersk-Training/mt-testing-tool)
-  repo — or run the `onboard-repo` skill.
+- The full ADO runbook (variable groups, stage scoping, exact task configs) is the
+  `onboard-repo` Governance OS skill (served at `${GOVGATE_URL}/api/v1/skills`) — run it,
+  or read its `reference.md`.
 
 ## Multi-job pipelines
 
 ```bash
 # job A — creates the run, leaves it open
-govgate report unit-results.xml --no-complete       # emits MT_RUN_ID (GH output / ADO variable)
+govgate report unit-results.xml --no-complete       # emits GOVGATE_RUN_ID (GH output / ADO variable)
 
 # job B — appends to the same run
-govgate report e2e-results.xml --run-id $MT_RUN_ID --no-complete
+govgate report e2e-results.xml --run-id $GOVGATE_RUN_ID --no-complete
 
 # final job — completes + gates over everything
-govgate complete --run-id $MT_RUN_ID --fail-on fail --min-executed 80
+govgate complete --run-id $GOVGATE_RUN_ID --fail-on fail --min-executed 80
 ```
 
-See `docs/examples/github-actions-ci-report.yml` and
-`docs/examples/azure-devops-ci-report.yml` in the
-[Maersk-Training/mt-testing-tool](https://github.com/Maersk-Training/mt-testing-tool)
-repo for full pipelines.
+Full pipeline examples for GitHub Actions and Azure DevOps ship with your Governance OS
+deployment (served alongside the skills at `${GOVGATE_URL}/api/v1/skills`).
 
 ## Registry
 

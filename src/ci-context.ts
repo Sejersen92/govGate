@@ -42,10 +42,10 @@ export function detectCiContext(env = process.env): CiContext {
 
 // Makes the run id available to later pipeline jobs/steps.
 export function emitRunIdVariable(runId: string, ctx: CiContext, env = process.env) {
-  console.log(`MT_RUN_ID=${runId}`);
+  console.log(`GOVGATE_RUN_ID=${runId}`);
   if (ctx.provider === "github" && env.GITHUB_OUTPUT) {
     appendFileSync(env.GITHUB_OUTPUT, `run-id=${runId}\n`);
   } else if (ctx.provider === "azure-devops") {
-    console.log(`##vso[task.setvariable variable=MT_RUN_ID;isOutput=true]${runId}`);
+    console.log(`##vso[task.setvariable variable=GOVGATE_RUN_ID;isOutput=true]${runId}`);
   }
 }

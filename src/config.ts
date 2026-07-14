@@ -111,19 +111,19 @@ export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): Resolved
   const configPath = findConfigFile(cwd, flags.config);
   const file: FileConfig = configPath ? loadFileConfig(configPath) : {};
 
-  const url = flags.url ?? process.env.MT_TESTING_TOOL_URL;
-  const apiKey = flags.apiKey ?? process.env.MT_TESTING_TOOL_API_KEY;
+  const url = flags.url ?? process.env.GOVGATE_URL;
+  const apiKey = flags.apiKey ?? process.env.GOVGATE_API_KEY;
   const suite = flags.suite ?? file.suite;
   const environment = flags.env ?? file.defaultEnvironment;
 
   if (!url) {
     throw new ConfigError(
-      "Tool URL missing. Set MT_TESTING_TOOL_URL or pass --url https://<your-deployment>",
+      "Tool URL missing. Set GOVGATE_URL or pass --url https://<your-deployment>",
     );
   }
   if (!apiKey) {
     throw new ConfigError(
-      "API key missing. Set MT_TESTING_TOOL_API_KEY (create one in the tool: Admin -> API keys, scoped to this application).",
+      "API key missing. Set GOVGATE_API_KEY (create one in the tool: Admin -> API keys, scoped to this application).",
     );
   }
   if (!suite) {
