@@ -7,6 +7,13 @@ import { ConfigError, loadFileMappings, resolveConfig } from "../src/config.js";
 let dir: string;
 const savedEnv = { ...process.env };
 
+// Writes govgate/config.json under baseDir (creating the govgate/ folder).
+function writeConfig(baseDir: string, obj: unknown): void {
+  const govDir = join(baseDir, "govgate");
+  mkdirSync(govDir, { recursive: true });
+  writeFileSync(join(govDir, "config.json"), JSON.stringify(obj));
+}
+
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mtcli-"));
   delete process.env.GOVGATE_URL;
@@ -18,11 +25,8 @@ afterEach(() => {
 });
 
 describe("resolveConfig", () => {
-  it("reads .mt-testing.json found upward from cwd", () => {
-    writeFileSync(
-      join(dir, ".mt-testing.json"),
-      JSON.stringify({ suite: "s1", defaultEnvironment: "dev", mappings: { "3": ["*x*"] } }),
-    );
+  it("reads govgate/config.json found upward from cwd", () => {
+    writeConfig(dir, { suite: "s1", defaultEnvironment: "dev", mappings: { "3": ["*x*"] } });
     const nested = join(dir, "a", "b");
     mkdirSync(nested, { recursive: true });
     process.env.GOVGATE_URL = "https://tool.example/";
@@ -36,7 +40,7 @@ describe("resolveConfig", () => {
   });
 
   it("flags override env and file", () => {
-    writeFileSync(join(dir, ".mt-testing.json"), JSON.stringify({ suite: "file-suite" }));
+    writeConfig(dir, { suite: "file-suite" });
     process.env.GOVGATE_URL = "https://env.example";
     process.env.GOVGATE_API_KEY = "mtk_env";
 
@@ -55,10 +59,7 @@ describe("resolveConfig", () => {
   });
 
   it("rejects malformed mappings", () => {
-    writeFileSync(
-      join(dir, ".mt-testing.json"),
-      JSON.stringify({ suite: "s", mappings: { abc: ["x"] } }),
-    );
+    writeConfig(dir, { suite: "s", mappings: { abc: ["x"] } });
     process.env.GOVGATE_URL = "https://x";
     process.env.GOVGATE_API_KEY = "mtk_x";
     expect(() => resolveConfig({}, dir)).toThrow(/case number/);
@@ -66,18 +67,15 @@ describe("resolveConfig", () => {
 });
 
 describe("loadFileMappings (dry-run, credential-free)", () => {
-  it("loads mappings from .mt-testing.json with NO url/apiKey set", () => {
+  it("loads mappings from govgate/config.json with NO url/apiKey set", () => {
     // Regression: --dry-run must resolve mappings offline. Previously it went
     // through resolveConfig, which threw on the missing API key and left every
     // test 'unmapped' — silently defeating the dry run's purpose.
-    writeFileSync(
-      join(dir, ".mt-testing.json"),
-      JSON.stringify({
-        suite: "development",
-        defaultEnvironment: "learnerservice-dev",
-        mappings: { "5": ["*Duplicate_Active_Email*"], "28": ["*SoftDelete_Resolves*"] },
-      }),
-    );
+    writeConfig(dir, {
+      suite: "development",
+      defaultEnvironment: "learnerservice-dev",
+      mappings: { "5": ["*Duplicate_Active_Email*"], "28": ["*SoftDelete_Resolves*"] },
+    });
     // deliberately no GOVGATE_URL / _API_KEY in env (cleared in beforeEach)
     const cfg = loadFileMappings({}, dir);
     expect(cfg.mappings).toEqual({

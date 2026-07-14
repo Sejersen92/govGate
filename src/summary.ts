@@ -16,7 +16,7 @@ export function printMappingTable(outcome: MappingOutcome) {
     );
   }
   if (outcome.unmappedTests.length) {
-    console.log(`\nUnmapped tests (${outcome.unmappedTests.length}) — add @mt-<case> tags or .mt-testing.json mappings:`);
+    console.log(`\nUnmapped tests (${outcome.unmappedTests.length}) — add @mt-<case> tags or govgate/config.json mappings:`);
     for (const t of outcome.unmappedTests.slice(0, 20)) console.log(`  - ${t.id}`);
     if (outcome.unmappedTests.length > 20)
       console.log(`  … and ${outcome.unmappedTests.length - 20} more`);

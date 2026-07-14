@@ -19,7 +19,7 @@ export type ResolvedConfig = {
 
 export class ConfigError extends Error {}
 
-// Searches upward from cwd for .mt-testing.json (repo-root convention).
+// Searches upward from cwd for govgate/config.json (repo-root convention).
 export function findConfigFile(startDir: string, explicitPath?: string): string | undefined {
   if (explicitPath) {
     const p = resolve(startDir, explicitPath);
@@ -28,7 +28,7 @@ export function findConfigFile(startDir: string, explicitPath?: string): string 
   }
   let dir = resolve(startDir);
   for (;;) {
-    const candidate = join(dir, ".mt-testing.json");
+    const candidate = join(dir, "govgate", "config.json");
     if (existsSync(candidate)) return candidate;
     const parent = dirname(dir);
     if (parent === dir) return undefined;
@@ -89,7 +89,7 @@ export type FileMappingConfig = {
 };
 
 // Loads only the file-level config (mappings/suite/environment) from
-// .mt-testing.json — WITHOUT requiring url/apiKey. --dry-run uses this so that
+// govgate/config.json — WITHOUT requiring url/apiKey. --dry-run uses this so that
 // mapping resolution works offline (the whole point of a dry run); credentials
 // gate only the suite-case validation, never the mapping itself.
 export function loadFileMappings(
@@ -106,7 +106,7 @@ export function loadFileMappings(
   };
 }
 
-// Precedence: flags > environment variables > .mt-testing.json.
+// Precedence: flags > environment variables > govgate/config.json.
 export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): ResolvedConfig {
   const configPath = findConfigFile(cwd, flags.config);
   const file: FileConfig = configPath ? loadFileConfig(configPath) : {};
@@ -128,7 +128,7 @@ export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): Resolved
   }
   if (!suite) {
     throw new ConfigError(
-      'Suite missing. Pass --suite <slug> or add { "suite": "<slug>" } to .mt-testing.json in the repo root.',
+      'Suite missing. Pass --suite <slug> or add { "suite": "<slug>" } to govgate/config.json in the repo root.',
     );
   }
 

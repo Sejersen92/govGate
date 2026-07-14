@@ -81,7 +81,7 @@ program
   .argument("<files...>", "result files or globs, e.g. test-results/*.xml")
   .option("--url <url>", "tool URL (or GOVGATE_URL)")
   .option("--api-key <key>", "API key (prefer GOVGATE_API_KEY)")
-  .option("--config <path>", "path to .mt-testing.json (default: searched upward)")
+  .option("--config <path>", "path to govgate/config.json (default: searched upward)")
   .option("--suite <slug>", "suite slug (overrides config)")
   .option("--env <slug>", "environment slug (overrides config)")
   .option("--name <name>", "run name (default: derived from CI context)")
@@ -108,7 +108,7 @@ program
         ? tryResolveConfig(flags)
         : resolveConfig(flags);
 
-      // In a dry run, mappings must load from .mt-testing.json even when
+      // In a dry run, mappings must load from govgate/config.json even when
       // credentials are absent — otherwise every test reports as "unmapped"
       // and the validation the dry run exists to provide is silently wrong.
       const mappings = config?.mappings ?? (opts.dryRun ? loadFileMappings(flags).mappings : {});
@@ -190,7 +190,7 @@ program
   .requiredOption("--run-id <uuid>", "run to complete")
   .option("--url <url>", "tool URL (or GOVGATE_URL)")
   .option("--api-key <key>", "API key (prefer GOVGATE_API_KEY)")
-  .option("--config <path>", "path to .mt-testing.json")
+  .option("--config <path>", "path to govgate/config.json")
   .option("--suite <slug>", "suite slug (only used for config resolution)")
   .option("--fail-on <list>", "statuses that fail the gate: fail | fail,blocked", "fail")
   .option("--min-executed <pct>", "minimum executed percentage required by the gate")

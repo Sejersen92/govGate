@@ -21,7 +21,7 @@ standard reporter.
 |---|---|---|
 | `--url <url>` | `GOVGATE_URL` | Tool deployment URL |
 | `--api-key <key>` | `GOVGATE_API_KEY` | API key (env var strongly preferred) |
-| `--config <path>` | `.mt-testing.json` searched upward | Config file |
+| `--config <path>` | `govgate/config.json` searched upward | Config file |
 | `--suite <slug>` | config `suite` | Target suite |
 | `--env <slug>` | config `defaultEnvironment` | Environment for the run |
 | `--name <name>` | derived from CI context | Run name |
@@ -61,7 +61,7 @@ Resolution per test (results are unioned):
    what .NET JUnit loggers emit), an underscore-delimited `Mt<n>` token maps the test:
    `Mt5_DuplicateEmail_Rejected`, `Profiles_Mt12_NotFound`, `Delete_Resolves_MT28`.
    Embedded substrings (`GMT5_…`, `Format2_…`) do not match.
-3. **Config patterns** in `.mt-testing.json`:
+3. **Config patterns** in `govgate/config.json`:
 
 ```jsonc
 {
