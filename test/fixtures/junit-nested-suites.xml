@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites>
+  <testsuite name="root">
+    <testsuite name="Login flow">
+      <testcase classname="Login flow" name="redirects to signin"/>
+      <testcase classname="Login flow" name="handles expired session">
+        <error message="timeout">TimeoutError: page did not settle</error>
+      </testcase>
+    </testsuite>
+  </testsuite>
+</testsuites>

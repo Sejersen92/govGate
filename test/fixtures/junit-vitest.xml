@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="vitest tests" tests="4" failures="1" errors="0" time="1.23">
+  <testsuite name="checkout.spec.ts" timestamp="2026-07-10T10:00:00" hostname="ci" tests="3" failures="1" errors="0" skipped="0" time="1.0">
+    <testcase classname="checkout.spec.ts" file="src/checkout.spec.ts" name="completes checkout with sandbox card @mt-1" time="0.5"/>
+    <testcase classname="checkout.spec.ts" file="src/checkout.spec.ts" name="shows price breakdown @mt-1 @mt-3" time="0.2"/>
+    <testcase classname="checkout.spec.ts" file="src/checkout.spec.ts" name="rejects expired card" time="0.3">
+      <failure message="expected 402 but received 500">AssertionError: expected 402 but received 500
+    at src/checkout.spec.ts:42:10</failure>
+    </testcase>
+  </testsuite>
+  <testsuite name="footer.spec.ts" tests="1" failures="0" errors="0" skipped="1" time="0.23">
+    <testcase classname="footer.spec.ts" file="src/footer.spec.ts" name="renders legal links" time="0">
+      <skipped/>
+    </testcase>
+  </testsuite>
+</testsuites>
