@@ -81,6 +81,31 @@ export type ConfigFlags = {
   config?: string;
 };
 
+export type FileMappingConfig = {
+  mappings: Mappings;
+  suite?: string;
+  environment?: string;
+  configPath?: string;
+};
+
+// Loads only the file-level config (mappings/suite/environment) from
+// .mt-testing.json — WITHOUT requiring url/apiKey. --dry-run uses this so that
+// mapping resolution works offline (the whole point of a dry run); credentials
+// gate only the suite-case validation, never the mapping itself.
+export function loadFileMappings(
+  flags: Pick<ConfigFlags, "config" | "suite" | "env">,
+  cwd = process.cwd(),
+): FileMappingConfig {
+  const configPath = findConfigFile(cwd, flags.config);
+  const file: FileConfig = configPath ? loadFileConfig(configPath) : {};
+  return {
+    mappings: file.mappings ?? {},
+    suite: flags.suite ?? file.suite,
+    environment: flags.env ?? file.defaultEnvironment,
+    configPath,
+  };
+}
+
 // Precedence: flags > environment variables > .mt-testing.json.
 export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): ResolvedConfig {
   const configPath = findConfigFile(cwd, flags.config);

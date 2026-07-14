@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ConfigError, resolveConfig } from "../src/config.js";
+import { ConfigError, loadFileMappings, resolveConfig } from "../src/config.js";
 
 let dir: string;
 const savedEnv = { ...process.env };
@@ -62,5 +62,35 @@ describe("resolveConfig", () => {
     process.env.MT_TESTING_TOOL_URL = "https://x";
     process.env.MT_TESTING_TOOL_API_KEY = "mtk_x";
     expect(() => resolveConfig({}, dir)).toThrow(/case number/);
+  });
+});
+
+describe("loadFileMappings (dry-run, credential-free)", () => {
+  it("loads mappings from .mt-testing.json with NO url/apiKey set", () => {
+    // Regression: --dry-run must resolve mappings offline. Previously it went
+    // through resolveConfig, which threw on the missing API key and left every
+    // test 'unmapped' — silently defeating the dry run's purpose.
+    writeFileSync(
+      join(dir, ".mt-testing.json"),
+      JSON.stringify({
+        suite: "development",
+        defaultEnvironment: "learnerservice-dev",
+        mappings: { "5": ["*Duplicate_Active_Email*"], "28": ["*SoftDelete_Resolves*"] },
+      }),
+    );
+    // deliberately no MT_TESTING_TOOL_URL / _API_KEY in env (cleared in beforeEach)
+    const cfg = loadFileMappings({}, dir);
+    expect(cfg.mappings).toEqual({
+      "5": ["*Duplicate_Active_Email*"],
+      "28": ["*SoftDelete_Resolves*"],
+    });
+    expect(cfg.suite).toBe("development");
+    expect(cfg.environment).toBe("learnerservice-dev");
+  });
+
+  it("returns empty mappings (not a throw) when no config file exists", () => {
+    const cfg = loadFileMappings({}, dir);
+    expect(cfg.mappings).toEqual({});
+    expect(cfg.suite).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { glob } from "tinyglobby";
 import { ApiClient, ApiError } from "./api.js";
 import { detectCiContext, emitRunIdVariable } from "./ci-context.js";
-import { ConfigError, resolveConfig, type ConfigFlags } from "./config.js";
+import { ConfigError, loadFileMappings, resolveConfig, type ConfigFlags } from "./config.js";
 import { evaluateGate, parseFailOn, type GateOptions } from "./gate.js";
 import { mapTestsToCases } from "./mapping.js";
 import { parseJUnitXml } from "./parsers/junit.js";
@@ -108,7 +108,10 @@ program
         ? tryResolveConfig(flags)
         : resolveConfig(flags);
 
-      const mappings = config?.mappings ?? {};
+      // In a dry run, mappings must load from .mt-testing.json even when
+      // credentials are absent — otherwise every test reports as "unmapped"
+      // and the validation the dry run exists to provide is silently wrong.
+      const mappings = config?.mappings ?? (opts.dryRun ? loadFileMappings(flags).mappings : {});
       const outcome = mapTestsToCases(tests, mappings);
       console.log(
         `Parsed ${tests.length} test(s) from ${files.join(", ")} — ${outcome.results.length} case(s) mapped, ${outcome.unmappedTests.length} unmapped test(s)`,
