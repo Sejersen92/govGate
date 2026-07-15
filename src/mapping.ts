@@ -30,11 +30,20 @@ function patternToRegex(pattern: string): RegExp {
   return new RegExp(`^${escaped}$`, "i");
 }
 
+// xUnit [Theory] display names append inline args: `Mt11_Forward(status: "500")`.
+// The args carry whitespace/quotes that would disqualify the whole name from
+// method-token matching, so strip a trailing "(...)" to recover the bare method
+// name. [Fact] names (no parens) are returned unchanged.
+function bareMethodName(name: string): string {
+  return name.replace(/\s*\(.*\)$/, "");
+}
+
 function tagCases(test: ParsedTest): number[] {
   const haystack = `${test.name} ${test.classname ?? ""}`;
   const cases = [...haystack.matchAll(TAG_RE)].map((m) => Number(m[1]));
-  if (!/\s/.test(test.name)) {
-    cases.push(...[...test.name.matchAll(METHOD_TAG_RE)].map((m) => Number(m[1])));
+  const bare = bareMethodName(test.name);
+  if (!/\s/.test(bare)) {
+    cases.push(...[...bare.matchAll(METHOD_TAG_RE)].map((m) => Number(m[1])));
   }
   return cases;
 }

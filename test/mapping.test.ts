@@ -44,6 +44,15 @@ describe("resolveCases", () => {
     expect(resolveCases(test({ name: "Batch_Mt_7_Works" }), {})).toEqual([7]);
   });
 
+  it("strips xUnit [Theory] args before matching the Mt<n> token (finding #14)", () => {
+    // Theory display names append `(argname: value)`; the args carry whitespace
+    // that used to disqualify the whole name. Strip the trailing (...) first.
+    expect(resolveCases(test({ name: 'Mt11_Forward_TransientStatus(status: "500")' }), {})).toEqual([11]);
+    expect(resolveCases(test({ name: 'Mt3_InitiateBookingFlow_CartAlreadyProcessed(x: 1, y: 2)' }), {})).toEqual([3]);
+    // trailing token followed by the args paren still matches (lookahead sees end)
+    expect(resolveCases(test({ name: 'Delete_Resolves_Mt28(id: "abc")' }), {})).toEqual([28]);
+  });
+
   it("does not apply the method-name convention to names with spaces", () => {
     expect(resolveCases(test({ name: "the mt5 terminal renders" }), {})).toEqual([]);
   });
