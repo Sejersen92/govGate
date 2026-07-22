@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Mappings } from "./mapping.js";
 
@@ -19,13 +19,28 @@ export type ResolvedConfig = {
 
 export class ConfigError extends Error {}
 
-// Searches upward from cwd for govgate/config.json (repo-root convention).
-export function findConfigFile(startDir: string, explicitPath?: string): string | undefined {
-  if (explicitPath) {
-    const p = resolve(startDir, explicitPath);
-    if (!existsSync(p)) throw new ConfigError(`Config file not found: ${p}`);
-    return p;
-  }
+// Directories a downward search never needs to enter — build output, VCS, and
+// dependency trees. Keeps the fallback scan cheap and avoids matching a
+// govgate/config.json that got vendored into a dependency.
+const SKIP_DIRS = new Set([
+  "node_modules",
+  ".git",
+  ".next",
+  ".vs",
+  ".vscode",
+  ".idea",
+  "dist",
+  "build",
+  "bin",
+  "obj",
+  "coverage",
+  ".turbo",
+  ".cache",
+]);
+const DOWNWARD_MAX_DEPTH = 6;
+
+// Searches upward from startDir for govgate/config.json (repo-root convention).
+function findConfigUpward(startDir: string): string | undefined {
   let dir = resolve(startDir);
   for (;;) {
     const candidate = join(dir, "govgate", "config.json");
@@ -34,6 +49,80 @@ export function findConfigFile(startDir: string, explicitPath?: string): string 
     if (parent === dir) return undefined;
     dir = parent;
   }
+}
+
+// Fallback for when the config sits in a SUBFOLDER of the working directory —
+// e.g. a release drop where govgate/config.json lands under
+// _<artifact>/drop/govgate/ and the CI step runs from the drop root. Bounded
+// breadth-first scan; returns every govgate/config.json found (deduped, sorted)
+// so the caller can refuse to guess when there is more than one.
+function findConfigDownward(startDir: string): string[] {
+  const root = resolve(startDir);
+  const found: string[] = [];
+  const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+
+  while (queue.length > 0) {
+    const { dir, depth } = queue.shift()!;
+
+    const direct = join(dir, "govgate", "config.json");
+    if (existsSync(direct)) found.push(direct);
+
+    if (depth >= DOWNWARD_MAX_DEPTH) continue;
+
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue; // unreadable dir (permissions, race) — skip, don't fail discovery
+    }
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name === "govgate") continue; // already probed via `direct`
+      if (SKIP_DIRS.has(entry.name)) continue;
+      queue.push({ dir: join(dir, entry.name), depth: depth + 1 });
+    }
+  }
+
+  return [...new Set(found)].sort();
+}
+
+// Resolves govgate/config.json. Precedence: explicit --config, then the
+// repo-root convention (nearest config at or above cwd), then a bounded
+// downward scan so the tool still works when run one level away from the
+// config (the common release-drop case). A downward scan that finds MORE than
+// one config refuses to guess — an ambiguous suite is reported, never silently
+// picked.
+export function findConfigFile(startDir: string, explicitPath?: string): string | undefined {
+  if (explicitPath) {
+    const p = resolve(startDir, explicitPath);
+    if (!existsSync(p)) throw new ConfigError(`Config file not found: ${p}`);
+    return p;
+  }
+
+  const upward = findConfigUpward(startDir);
+  if (upward) return upward;
+
+  const downward = findConfigDownward(startDir);
+  if (downward.length === 1) {
+    // Visible in CI logs so an unexpected auto-discovery is never silent.
+    console.error(
+      `govgate: no govgate/config.json at or above ${resolve(startDir)}; using discovered ${downward[0]}`,
+    );
+    return downward[0];
+  }
+  if (downward.length > 1) {
+    throw new ConfigError(
+      `Ambiguous config: found ${downward.length} govgate/config.json files under ${resolve(
+        startDir,
+      )} and none at or above it:\n${downward
+        .map((p) => `  - ${p}`)
+        .join(
+          "\n",
+        )}\nPick one with --config <path>, pass --suite <slug>, or run govgate from the intended directory.`,
+    );
+  }
+
+  return undefined;
 }
 
 export function loadFileConfig(path: string): FileConfig {
@@ -127,8 +216,15 @@ export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): Resolved
     );
   }
   if (!suite) {
+    if (!configPath) {
+      throw new ConfigError(
+        `No govgate/config.json found (searched upward from ${resolve(
+          cwd,
+        )}, then downward). Run govgate from your repo root or the artifact/drop folder that contains govgate/, pass --config <path>, or pass --suite <slug>.`,
+      );
+    }
     throw new ConfigError(
-      'Suite missing. Pass --suite <slug> or add { "suite": "<slug>" } to govgate/config.json in the repo root.',
+      `Suite missing in ${configPath}. Add { "suite": "<slug>" } to that file or pass --suite <slug>.`,
     );
   }
 

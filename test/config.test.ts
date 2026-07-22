@@ -50,12 +50,57 @@ describe("resolveConfig", () => {
     expect(cfg.apiKey).toBe("mtk_env");
   });
 
-  it("throws actionable errors for missing url/key/suite", () => {
+  it("throws actionable errors for missing url/key", () => {
     expect(() => resolveConfig({}, dir)).toThrow(ConfigError);
     process.env.GOVGATE_URL = "https://x";
     expect(() => resolveConfig({}, dir)).toThrow(/API key/);
+  });
+
+  it("distinguishes 'no config found' from 'config found but no suite'", () => {
+    process.env.GOVGATE_URL = "https://x";
     process.env.GOVGATE_API_KEY = "mtk_x";
-    expect(() => resolveConfig({}, dir)).toThrow(/Suite/);
+
+    // Nothing at, above, or below cwd → point the user at the working directory,
+    // not at editing a file that does not exist.
+    expect(() => resolveConfig({}, dir)).toThrow(/No govgate\/config\.json found/);
+    expect(() => resolveConfig({}, dir)).toThrow(new RegExp(dir.replace(/\\/g, "\\\\")));
+
+    // Config exists but omits suite → name the file to edit.
+    writeConfig(dir, { defaultEnvironment: "dev" });
+    expect(() => resolveConfig({}, dir)).toThrow(/Suite missing in .*config\.json/);
+  });
+
+  it("falls back to a config in a SUBFOLDER when none is found upward (release-drop layout)", () => {
+    // Mirrors a release drop: govgate/config.json lands under a nested folder and
+    // the CI step runs from the drop root, one level above it.
+    const drop = join(dir, "_Customer Service", "drop");
+    writeConfig(drop, { suite: "customerservice-core", defaultEnvironment: "dev" });
+    process.env.GOVGATE_URL = "https://x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
+
+    const cfg = resolveConfig({}, dir);
+    expect(cfg.suite).toBe("customerservice-core");
+    expect(cfg.configPath).toBe(join(drop, "govgate", "config.json"));
+  });
+
+  it("prefers an upward config over a downward one", () => {
+    writeConfig(dir, { suite: "root-suite" });
+    writeConfig(join(dir, "sub"), { suite: "sub-suite" });
+    process.env.GOVGATE_URL = "https://x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
+
+    // From the root, the upward (nearest) config wins; the subfolder is not scanned.
+    expect(resolveConfig({}, dir).suite).toBe("root-suite");
+  });
+
+  it("refuses to guess when downward search finds multiple configs (double-suite guard)", () => {
+    writeConfig(join(dir, "one"), { suite: "suite-one" });
+    writeConfig(join(dir, "two"), { suite: "suite-two" });
+    process.env.GOVGATE_URL = "https://x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
+
+    expect(() => resolveConfig({}, dir)).toThrow(/Ambiguous config/);
+    expect(() => resolveConfig({}, dir)).toThrow(/found 2 govgate\/config\.json/);
   });
 
   it("rejects malformed mappings", () => {
