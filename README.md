@@ -23,7 +23,8 @@ standard reporter.
 | `--api-key <key>` | `GOVGATE_API_KEY` | API key (env var strongly preferred) |
 | `--config <path>` | `govgate/config.json` searched upward | Config file |
 | `--suite <slug>` | config `suite` | Target suite |
-| `--env <slug>` | config `defaultEnvironment` | Environment for the run |
+| `--env <slug>` | inferred, else config `defaultEnvironment` | Environment for the run (overrides inference) |
+| `--base-url <url>` | `API_BASEURL` | Live app base URL; matched against the declared environments' `baseUrl`s to infer the environment |
 | `--name <name>` | derived from CI context | Run name |
 | `--build-version <v>` | short commit SHA from CI | Build version |
 | `--external-url <url>` | CI build URL | "Build ↗" link on the run page |
@@ -48,6 +49,23 @@ slug: an existing `dev` is updated in place, never duplicated. Takes `--url`,
 automatically before creating a run when the block is present, so a brand-new stage
 can never fail on an unknown environment — the explicit command exists for
 onboarding-time provisioning and for verifying the catalog without reporting.
+
+## Environment inference (v0.5.0+)
+
+When `--env` is absent, `report` resolves the environment **from the deployment
+under test**: the base URL (from `--base-url` or the `API_BASEURL` env var — the
+same variable your smoke tests already use) is matched against the declared
+environments' `baseUrl`s, and the matching slug wins. Falls back to
+`defaultEnvironment` when nothing matches. Matching ignores scheme, casing, and
+trailing slashes.
+
+This makes one identical report step correct in every stage — no per-stage
+`--env` variable to configure or mis-copy. The chosen slug is always printed to
+the CI log.
+
+```
+npx govgate report "test-results/*.xml" --fail-on fail   # env inferred from API_BASEURL
+```
 
 ## Exit codes
 

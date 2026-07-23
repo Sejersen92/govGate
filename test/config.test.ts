@@ -2,7 +2,13 @@ import { mkdtempSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ConfigError, loadFileMappings, resolveConfig } from "../src/config.js";
+import {
+  ConfigError,
+  inferEnvironment,
+  loadFileMappings,
+  normalizeBaseUrl,
+  resolveConfig,
+} from "../src/config.js";
 
 let dir: string;
 const savedEnv = { ...process.env };
@@ -18,6 +24,7 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), "mtcli-"));
   delete process.env.GOVGATE_URL;
   delete process.env.GOVGATE_API_KEY;
+  delete process.env.API_BASEURL;
 });
 
 afterEach(() => {
@@ -203,5 +210,87 @@ describe("loadFileMappings (dry-run, credential-free)", () => {
     const cfg = loadFileMappings({}, dir);
     expect(cfg.mappings).toEqual({});
     expect(cfg.suite).toBeUndefined();
+  });
+});
+
+describe("normalizeBaseUrl", () => {
+  it("ignores scheme, case, and trailing slashes", () => {
+    expect(normalizeBaseUrl("https://App.Example/")).toBe("app.example");
+    expect(normalizeBaseUrl("http://app.example")).toBe("app.example");
+    expect(normalizeBaseUrl("app.example///")).toBe("app.example");
+  });
+
+  it("keeps distinguishing ports and paths", () => {
+    expect(normalizeBaseUrl("https://app.example:8080")).toBe("app.example:8080");
+    expect(normalizeBaseUrl("https://app.example/api/")).toBe("app.example/api");
+    expect(normalizeBaseUrl("https://app.example/api")).not.toBe(normalizeBaseUrl("https://app.example"));
+  });
+
+  it("returns undefined for unparseable input", () => {
+    expect(normalizeBaseUrl("")).toBeUndefined();
+    expect(normalizeBaseUrl("   ")).toBeUndefined();
+    expect(normalizeBaseUrl("https://")).toBeUndefined();
+  });
+});
+
+describe("inferEnvironment", () => {
+  const catalog = [
+    { slug: "dev", name: "DEV", baseUrl: "https://fa-app-dev-api.azurewebsites.net" },
+    { slug: "uat", name: "UAT", baseUrl: "https://fa-app-uatneu-api.azurewebsites.net" },
+    { slug: "prod", name: "PROD" }, // no baseUrl — never matched
+  ];
+
+  it("returns the slug whose baseUrl matches the live URL", () => {
+    expect(inferEnvironment(catalog, "https://fa-app-dev-api.azurewebsites.net")).toBe("dev");
+    expect(inferEnvironment(catalog, "https://FA-APP-UATNEU-API.azurewebsites.net/")).toBe("uat");
+  });
+
+  it("returns undefined when nothing matches or inputs are absent", () => {
+    expect(inferEnvironment(catalog, "https://unrelated.example")).toBeUndefined();
+    expect(inferEnvironment(catalog, undefined)).toBeUndefined();
+    expect(inferEnvironment(undefined, "https://fa-app-dev-api.azurewebsites.net")).toBeUndefined();
+    expect(inferEnvironment([], "https://fa-app-dev-api.azurewebsites.net")).toBeUndefined();
+  });
+});
+
+describe("environment inference in resolveConfig (code-first env selection)", () => {
+  const environments = [
+    { slug: "dev", name: "DEV", baseUrl: "https://fa-app-dev-api.azurewebsites.net" },
+    { slug: "uat", name: "UAT", baseUrl: "https://fa-app-uatneu-api.azurewebsites.net" },
+  ];
+
+  beforeEach(() => {
+    process.env.GOVGATE_URL = "https://x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
+  });
+
+  it("infers the environment from API_BASEURL when --env is absent", () => {
+    writeConfig(dir, { suite: "s", defaultEnvironment: "dev", environments });
+    process.env.API_BASEURL = "https://fa-app-uatneu-api.azurewebsites.net";
+    expect(resolveConfig({}, dir).environment).toBe("uat");
+  });
+
+  it("prefers the --base-url flag over API_BASEURL", () => {
+    writeConfig(dir, { suite: "s", defaultEnvironment: "dev", environments });
+    process.env.API_BASEURL = "https://fa-app-uatneu-api.azurewebsites.net";
+    const cfg = resolveConfig({ baseUrl: "https://fa-app-dev-api.azurewebsites.net" }, dir);
+    expect(cfg.environment).toBe("dev");
+  });
+
+  it("--env always wins over inference", () => {
+    writeConfig(dir, { suite: "s", defaultEnvironment: "dev", environments });
+    process.env.API_BASEURL = "https://fa-app-uatneu-api.azurewebsites.net";
+    expect(resolveConfig({ env: "prod" }, dir).environment).toBe("prod");
+  });
+
+  it("falls back to defaultEnvironment when the base URL matches nothing", () => {
+    writeConfig(dir, { suite: "s", defaultEnvironment: "dev", environments });
+    process.env.API_BASEURL = "https://unrelated.example";
+    expect(resolveConfig({}, dir).environment).toBe("dev");
+  });
+
+  it("falls back to defaultEnvironment when no base URL is available at all", () => {
+    writeConfig(dir, { suite: "s", defaultEnvironment: "dev", environments });
+    expect(resolveConfig({}, dir).environment).toBe("dev");
   });
 });

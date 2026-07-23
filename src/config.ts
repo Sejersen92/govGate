@@ -220,7 +220,44 @@ export type ConfigFlags = {
   suite?: string;
   env?: string;
   config?: string;
+  baseUrl?: string;
 };
+
+// Normalizes a base URL for catalog comparison: scheme is ignored (http vs
+// https never distinguishes environments), host and path are lowercased, and
+// trailing slashes are stripped — so "https://App.example/" and
+// "app.example" compare equal. Returns undefined for unparseable input.
+export function normalizeBaseUrl(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (trimmed === "") return undefined;
+  const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  let url: URL;
+  try {
+    url = new URL(withScheme);
+  } catch {
+    return undefined;
+  }
+  const path = url.pathname.replace(/\/+$/, "");
+  return `${url.host}${path}`.toLowerCase();
+}
+
+// Code-first environment selection: matches the base URL of the app that was
+// actually tested against the declared catalog's baseUrls and returns the
+// matching slug. This is what lets one identical report step serve every
+// stage — the environment is derived from the deployment under test instead
+// of a per-stage variable that can be mis-copied.
+export function inferEnvironment(
+  environments: EnvironmentDeclaration[] | undefined,
+  baseUrl: string | undefined,
+): string | undefined {
+  if (!baseUrl || !environments?.length) return undefined;
+  const target = normalizeBaseUrl(baseUrl);
+  if (!target) return undefined;
+  for (const env of environments) {
+    if (env.baseUrl && normalizeBaseUrl(env.baseUrl) === target) return env.slug;
+  }
+  return undefined;
+}
 
 export type FileMappingConfig = {
   mappings: Mappings;
@@ -248,6 +285,8 @@ export function loadFileMappings(
 }
 
 // Precedence: flags > environment variables > govgate/config.json.
+// Environment specifically: --env > baseUrl inference (--base-url / API_BASEURL
+// matched against the declared catalog) > defaultEnvironment.
 export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): ResolvedConfig {
   const configPath = findConfigFile(cwd, flags.config);
   const file: FileConfig = configPath ? loadFileConfig(configPath) : {};
@@ -255,7 +294,27 @@ export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): Resolved
   const url = flags.url ?? process.env.GOVGATE_URL;
   const apiKey = flags.apiKey ?? process.env.GOVGATE_API_KEY;
   const suite = flags.suite ?? file.suite;
-  const environment = flags.env ?? file.defaultEnvironment;
+
+  let environment = flags.env;
+  if (!environment) {
+    const liveBaseUrl = flags.baseUrl ?? process.env.API_BASEURL;
+    const inferred = inferEnvironment(file.environments, liveBaseUrl);
+    if (inferred) {
+      // Visible in CI logs so the run is never attached to a slug silently.
+      console.error(`govgate: environment '${inferred}' inferred from base URL ${liveBaseUrl}`);
+      environment = inferred;
+    } else {
+      if (liveBaseUrl && file.environments?.some((e) => e.baseUrl)) {
+        console.error(
+          `govgate: base URL ${liveBaseUrl} matches no declared environment baseUrl` +
+            (file.defaultEnvironment
+              ? `; falling back to defaultEnvironment '${file.defaultEnvironment}'`
+              : " and no defaultEnvironment is set"),
+        );
+      }
+      environment = file.defaultEnvironment;
+    }
+  }
 
   if (!url) {
     throw new ConfigError(

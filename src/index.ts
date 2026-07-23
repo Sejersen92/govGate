@@ -83,7 +83,11 @@ program
   .option("--api-key <key>", "API key (prefer GOVGATE_API_KEY)")
   .option("--config <path>", "path to govgate/config.json (default: searched upward)")
   .option("--suite <slug>", "suite slug (overrides config)")
-  .option("--env <slug>", "environment slug (overrides config)")
+  .option("--env <slug>", "environment slug (overrides config and inference)")
+  .option(
+    "--base-url <url>",
+    "base URL of the app under test; matched against the declared environments' baseUrls to infer the environment (default: API_BASEURL)",
+  )
   .option("--name <name>", "run name (default: derived from CI context)")
   .option("--build-version <v>", "build version (default: short commit SHA from CI)")
   .option("--external-url <url>", "link to the build/PR (default: from CI context)")
@@ -102,6 +106,7 @@ program
         suite: opts.suite,
         env: opts.env,
         config: opts.config,
+        baseUrl: opts.baseUrl,
       };
       const tests = await parseFiles(files, opts.format);
       const config = opts.dryRun
