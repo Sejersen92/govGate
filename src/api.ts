@@ -1,3 +1,4 @@
+import type { EnvironmentDeclaration } from "./config.js";
 import type { StatusCounts } from "./gate.js";
 
 export class ApiError extends Error {
@@ -25,6 +26,12 @@ export type RunSummary = {
   environment: string | null;
   counts: StatusCounts;
   executedPercent: number;
+};
+
+export type SyncEnvironmentsResponse = {
+  created: number;
+  updated: number;
+  environments: { slug: string; name: string; baseUrl: string | null; notes: string | null }[];
 };
 
 export type ResultPayload = {
@@ -67,6 +74,12 @@ export class ApiClient {
       throw new ApiError(`${method} ${path} -> ${res.status}: ${detail}`, res.status);
     }
     return JSON.parse(text) as T;
+  }
+
+  // Idempotent by (application, slug): existing environments are updated in
+  // place, never duplicated. The API key scopes everything to one application.
+  putEnvironments(environments: EnvironmentDeclaration[]): Promise<SyncEnvironmentsResponse> {
+    return this.request("PUT", "/api/v1/environments", { environments });
   }
 
   createRun(input: {

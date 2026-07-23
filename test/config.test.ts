@@ -111,6 +111,74 @@ describe("resolveConfig", () => {
   });
 });
 
+describe("environments declaration (code-first catalog)", () => {
+  beforeEach(() => {
+    process.env.GOVGATE_URL = "https://x";
+    process.env.GOVGATE_API_KEY = "mtk_x";
+  });
+
+  it("parses a full environments block and exposes it on the resolved config", () => {
+    writeConfig(dir, {
+      suite: "s",
+      defaultEnvironment: "dev",
+      environments: [
+        { slug: "dev", name: "DEV", baseUrl: "https://dev.example", notes: "sandbox" },
+        { slug: "uat", name: "UAT" },
+        { slug: "prod", name: "PROD", baseUrl: "https://www.example" },
+      ],
+    });
+    const cfg = resolveConfig({}, dir);
+    expect(cfg.environments).toEqual([
+      { slug: "dev", name: "DEV", baseUrl: "https://dev.example", notes: "sandbox" },
+      { slug: "uat", name: "UAT" },
+      { slug: "prod", name: "PROD", baseUrl: "https://www.example" },
+    ]);
+  });
+
+  it("is optional — configs without the block resolve with environments undefined", () => {
+    writeConfig(dir, { suite: "s" });
+    expect(resolveConfig({}, dir).environments).toBeUndefined();
+  });
+
+  it("rejects a non-array environments value", () => {
+    writeConfig(dir, { suite: "s", environments: { dev: "DEV" } });
+    expect(() => resolveConfig({}, dir)).toThrow(/"environments" must be an array/);
+  });
+
+  it("rejects invalid slugs (uppercase, leading hyphen, non-string)", () => {
+    for (const slug of ["DEV", "-dev", 7]) {
+      writeConfig(dir, { suite: "s", environments: [{ slug, name: "DEV" }] });
+      expect(() => resolveConfig({}, dir)).toThrow(/environments\[0\]\.slug/);
+    }
+  });
+
+  it("rejects duplicate slugs — the whole point is one row per environment", () => {
+    writeConfig(dir, {
+      suite: "s",
+      environments: [
+        { slug: "dev", name: "DEV" },
+        { slug: "dev", name: "DEV again" },
+      ],
+    });
+    expect(() => resolveConfig({}, dir)).toThrow(/duplicate environment slug "dev"/);
+  });
+
+  it("rejects a missing or empty name", () => {
+    writeConfig(dir, { suite: "s", environments: [{ slug: "dev" }] });
+    expect(() => resolveConfig({}, dir)).toThrow(/environments\[0\]\.name/);
+    writeConfig(dir, { suite: "s", environments: [{ slug: "dev", name: "  " }] });
+    expect(() => resolveConfig({}, dir)).toThrow(/environments\[0\]\.name/);
+  });
+
+  it("rejects more than 20 entries (server-side PUT limit)", () => {
+    writeConfig(dir, {
+      suite: "s",
+      environments: Array.from({ length: 21 }, (_, i) => ({ slug: `env-${i}`, name: `E${i}` })),
+    });
+    expect(() => resolveConfig({}, dir)).toThrow(/at most 20/);
+  });
+});
+
 describe("loadFileMappings (dry-run, credential-free)", () => {
   it("loads mappings from govgate/config.json with NO url/apiKey set", () => {
     // Regression: --dry-run must resolve mappings offline. Previously it went

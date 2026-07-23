@@ -2,9 +2,20 @@ import { readFileSync, existsSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import type { Mappings } from "./mapping.js";
 
+// Code-first environment catalog: declared in govgate/config.json, upserted to
+// the tool by slug (existing slugs are updated, never duplicated). The repo is
+// the source of truth; the web app is for curation (notes, deleting unused).
+export type EnvironmentDeclaration = {
+  slug: string;
+  name: string;
+  baseUrl?: string;
+  notes?: string;
+};
+
 export type FileConfig = {
   suite?: string;
   defaultEnvironment?: string;
+  environments?: EnvironmentDeclaration[];
   mappings?: Mappings;
 };
 
@@ -13,6 +24,7 @@ export type ResolvedConfig = {
   apiKey: string;
   suite: string;
   environment?: string;
+  environments?: EnvironmentDeclaration[];
   mappings: Mappings;
   configPath?: string;
 };
@@ -146,6 +158,9 @@ export function loadFileConfig(path: string): FileConfig {
       throw new ConfigError(`${path}: "defaultEnvironment" must be a string`);
     out.defaultEnvironment = cfg.defaultEnvironment;
   }
+  if (cfg.environments !== undefined) {
+    out.environments = parseEnvironments(path, cfg.environments);
+  }
   if (cfg.mappings !== undefined) {
     if (typeof cfg.mappings !== "object" || cfg.mappings === null)
       throw new ConfigError(`${path}: "mappings" must be an object`);
@@ -158,6 +173,43 @@ export function loadFileConfig(path: string): FileConfig {
       mappings[key] = value as string[];
     }
     out.mappings = mappings;
+  }
+  return out;
+}
+
+// Server-side limit on PUT /api/v1/environments; validated here so a too-long
+// catalog fails with a file-and-line message instead of an API 400.
+const MAX_ENVIRONMENTS = 20;
+// Matches the tool's slug rules (lowercase alphanumeric + hyphens).
+const SLUG_RE = /^[a-z0-9][a-z0-9-]*$/;
+
+function parseEnvironments(path: string, raw: unknown): EnvironmentDeclaration[] {
+  if (!Array.isArray(raw)) throw new ConfigError(`${path}: "environments" must be an array`);
+  if (raw.length > MAX_ENVIRONMENTS)
+    throw new ConfigError(`${path}: "environments" supports at most ${MAX_ENVIRONMENTS} entries`);
+  const seen = new Set<string>();
+  const out: EnvironmentDeclaration[] = [];
+  for (const [i, entry] of raw.entries()) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry))
+      throw new ConfigError(`${path}: environments[${i}] must be an object`);
+    const e = entry as Record<string, unknown>;
+    if (typeof e.slug !== "string" || !SLUG_RE.test(e.slug))
+      throw new ConfigError(
+        `${path}: environments[${i}].slug must be a lowercase slug (a-z, 0-9, hyphens)`,
+      );
+    if (seen.has(e.slug))
+      throw new ConfigError(`${path}: duplicate environment slug "${e.slug}"`);
+    seen.add(e.slug);
+    if (typeof e.name !== "string" || e.name.trim() === "")
+      throw new ConfigError(`${path}: environments[${i}].name must be a non-empty string`);
+    if (e.baseUrl !== undefined && typeof e.baseUrl !== "string")
+      throw new ConfigError(`${path}: environments[${i}].baseUrl must be a string`);
+    if (e.notes !== undefined && typeof e.notes !== "string")
+      throw new ConfigError(`${path}: environments[${i}].notes must be a string`);
+    const decl: EnvironmentDeclaration = { slug: e.slug, name: e.name };
+    if (e.baseUrl !== undefined) decl.baseUrl = e.baseUrl;
+    if (e.notes !== undefined) decl.notes = e.notes;
+    out.push(decl);
   }
   return out;
 }
@@ -233,6 +285,7 @@ export function resolveConfig(flags: ConfigFlags, cwd = process.cwd()): Resolved
     apiKey,
     suite,
     environment,
+    environments: file.environments,
     mappings: file.mappings ?? {},
     configPath,
   };

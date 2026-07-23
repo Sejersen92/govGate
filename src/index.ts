@@ -138,6 +138,22 @@ program
 
       let runId: string = opts.runId ?? "";
       if (!runId) {
+        // Environments declared in config are ensured (idempotent upsert by
+        // slug) before the run, so a brand-new stage can never 404 on an
+        // unknown environment. A sync failure is a warning, not a run failure
+        // — the environment may already exist server-side.
+        if (config!.environments?.length) {
+          try {
+            const sync = await api.putEnvironments(config!.environments);
+            if (sync.created > 0) {
+              console.log(`Created ${sync.created} declared environment(s).`);
+            }
+          } catch (e) {
+            console.error(
+              `Warning: environment sync failed (${e instanceof Error ? e.message : String(e)}) — continuing.`,
+            );
+          }
+        }
         const run = await api.createRun({
           suiteSlug: config!.suite,
           environmentSlug: config!.environment,
@@ -183,6 +199,37 @@ function tryResolveConfig(flags: ConfigFlags) {
     return undefined;
   }
 }
+
+program
+  .command("sync-env")
+  .description("Upsert the environments declared in govgate/config.json (idempotent by slug)")
+  .option("--url <url>", "tool URL (or GOVGATE_URL)")
+  .option("--api-key <key>", "API key (prefer GOVGATE_API_KEY)")
+  .option("--config <path>", "path to govgate/config.json (default: searched upward)")
+  .action(async (opts) => {
+    try {
+      const config = resolveConfig({
+        url: opts.url,
+        apiKey: opts.apiKey,
+        suite: "unused", // environments sync does not involve a suite
+        config: opts.config,
+      });
+      if (!config.environments?.length) {
+        throw new ConfigError(
+          `No "environments" declared in ${config.configPath ?? "govgate/config.json"}. ` +
+            `Add e.g. { "environments": [{ "slug": "dev", "name": "DEV" }] } to that file.`,
+        );
+      }
+      const api = new ApiClient(config.url, config.apiKey);
+      const res = await api.putEnvironments(config.environments);
+      console.log(`Environments synced: ${res.created} created, ${res.updated} updated.`);
+      for (const e of res.environments) {
+        console.log(`  ${e.slug}  ${e.name}${e.baseUrl ? `  ${e.baseUrl}` : ""}`);
+      }
+    } catch (e) {
+      handleError(e);
+    }
+  });
 
 program
   .command("complete")

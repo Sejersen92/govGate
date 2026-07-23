@@ -40,6 +40,15 @@ standard reporter.
 Completes a run left open by `--no-complete` and evaluates the gate over **all** results
 in the run (including those posted by other jobs).
 
+### `govgate sync-env`
+
+Upserts the environments declared in `govgate/config.json` to the tool. Idempotent by
+slug: an existing `dev` is updated in place, never duplicated. Takes `--url`,
+`--api-key`, `--config` (same resolution as `report`). `report` also runs this sync
+automatically before creating a run when the block is present, so a brand-new stage
+can never fail on an unknown environment — the explicit command exists for
+onboarding-time provisioning and for verifying the catalog without reporting.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -67,6 +76,15 @@ Resolution per test (results are unioned):
 {
   "suite": "checkout-regression",
   "defaultEnvironment": "dev",
+  // Code-first environment catalog (v0.4.0+): synced to the tool by slug
+  // (existing slugs update in place — never duplicated). Slugs are scoped per
+  // application, so the plain dev/uat/prod trio is safe for every service; add
+  // more (test, pre-prod, demo, …) as needed, up to 20.
+  "environments": [
+    { "slug": "dev",  "name": "DEV",  "baseUrl": "https://dev.example.com" },
+    { "slug": "uat",  "name": "UAT" },
+    { "slug": "prod", "name": "PROD", "baseUrl": "https://www.example.com", "notes": "Live." }
+  ],
   "mappings": {
     "4":  ["checkout.spec.ts::pays with saved card"],
     "7":  ["auth/*.spec.ts::*expired session*", "Login flow > redirects*"],
